@@ -1,0 +1,103 @@
+# Actividad 3 - Árboles de decisión
+# Predicción de supervivencia con árboles de decisión (Titanic Dataset)
+
+# ASIGNATURA
+# María Fernanda López Aramburo
+# Sección D02
+# Calendario 2026 B
+
+# INTEGRANTES
+# ICOM - Barrera Hermosillo Elizabeth Kristie - 220916338
+# ICOM -Rodríguez Luna Paulina - 223378663
+# ICOM - Velázquez Vazquéz Valeria - 224785718
+
+# Fecha de entrega: 24 de septiembre de 2026
+
+
+# Importar librerías
+import numpy as np # numpy: manejo de arreglos numéricos
+import pandas as pd # pandas: tablas de datos
+import csv # csv: leer datos iniciales
+import matplotlib.pyplot as plt # matplotlib: visualización
+from sklearn.tree import DecisionTreeClassifier, plot_tree #scikit-learn: clasificador de árbol de decisión
+from sklearn.model_selection import train_test_split #scikit-learn: ayudante para distribuir datos entre entrenamiento y prueba
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay #scikit-learn: ayudante para el cálculo de la matriz de confusión
+
+RANDOM_SEED = 8008
+
+y = []
+X = []
+with open("titanic_data.csv", 'r') as csv_data:
+    raw_data = csv.DictReader(csv_data) 
+
+    # Inicializacion de los arreglos que contienen los datos a tratar
+    for row in raw_data:
+        y.append(row['Survived'])
+        X.append([row['Pclass'], 0 if row['Sex'] == "male" else 1 , row['Age'], row['SibSp'], row['Fare']])
+
+# Calculo manual de las metricas para evitar recalcular la matriz de confusión, y por motivos didácticos
+def calculate_scores(matrix):
+    tn, fp, fn, tp = matrix.ravel().tolist()
+    accuracy = (tp+tn)/(tp+tn+fp+fn)
+    recall = (tp)/(tp+fn)
+    precision = (tp)/(tp+fp)
+    specificity = (tn)/(tn+fp)
+    f1_score = (2*precision*recall)/(precision+recall)
+    return [accuracy, recall, precision, specificity, f1_score]
+
+
+# Distribución de los datos entre entrenamiento y prueba,
+# cuidando que haya igual distrubución entre sobrevivientes y no sobrevivientes
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, stratify=y, random_state=RANDOM_SEED) 
+
+overadjusted_model = DecisionTreeClassifier(criterion='gini', random_state=RANDOM_SEED).fit(X_train, y_train)
+overadjusted_confusion_matrix = confusion_matrix(y_test, y_pred=overadjusted_model.predict(X_test))
+overadjusted_scores = calculate_scores(overadjusted_confusion_matrix)
+
+pretrimmed_model = DecisionTreeClassifier(max_depth=4, min_samples_split=5, criterion='gini', random_state=RANDOM_SEED).fit(X_train, y_train)
+pretrimmed_confusion_matrix = confusion_matrix(y_test, y_pred=pretrimmed_model.predict(X_test) )
+pretrimmed_scores = calculate_scores(pretrimmed_confusion_matrix)
+
+fig = plt.figure(figsize=(16, 9)) #Inicialización de la figura de matplotlib
+ROWS, COLS = 4,4
+TREE_ROW_SPAN, TREE_COL_SPAN = 3, 2
+
+plt.rcParams['text.usetex'] = True #Habilita el renderizado de ecuaciones con LaTeX
+
+# Renderizado de los árboles
+ax1 = plt.subplot2grid((ROWS, COLS),(0, 0), rowspan=TREE_ROW_SPAN, colspan=TREE_COL_SPAN)
+plot_tree(decision_tree=overadjusted_model, ax=ax1, fontsize=7)
+ax1.set_title(label="Árbol de decisión sobreajustado")
+
+ax2 = plt.subplot2grid((ROWS, COLS),(0, TREE_COL_SPAN), rowspan=TREE_ROW_SPAN, colspan=TREE_COL_SPAN)
+plot_tree(decision_tree=pretrimmed_model, ax=ax2, fontsize=10)
+ax2.set_title(label="Árbol de decisión pre-podado")
+
+# Renderizado de las métricas de los árboles junto con sus matrices de confusión
+def get_score_text(scores):
+    return f"Exactitud: {scores[0]:.2f}\nSensibilidad: {scores[1]:.2f}\nPrecisión: {scores[2]:.2f}\nEspecificidad: {scores[3]:.2f}\nF1-score: {scores[4]:.2f}"
+
+ax3 = plt.subplot2grid((ROWS, COLS), (TREE_ROW_SPAN, 0))
+ConfusionMatrixDisplay(overadjusted_confusion_matrix, display_labels=["P","N"]).plot(ax=ax3)
+ax3.set_xlabel("Valores predichos")
+ax3.set_ylabel("Valores reales")
+
+ax4 = plt.subplot2grid((ROWS, COLS), (TREE_ROW_SPAN, 1))
+ax4.set_axis_off()
+ax4.text(0, 0, get_score_text(overadjusted_scores), fontsize=12)
+
+ax5 = plt.subplot2grid((ROWS, COLS), (TREE_ROW_SPAN, TREE_COL_SPAN), colspan=1)
+ConfusionMatrixDisplay(pretrimmed_confusion_matrix, display_labels=["P","N"]).plot(ax=ax5)
+ax5.set_xlabel("Valores predichos")
+ax5.set_ylabel("Valores reales")
+
+ax6 = plt.subplot2grid((ROWS, COLS), (TREE_ROW_SPAN, TREE_COL_SPAN+1))
+ax6.set_axis_off()
+ax6.text(0, 0, get_score_text(pretrimmed_scores), fontsize=12)
+
+fig.savefig("decision_trees.png")
+
+# Mostrar la figura
+plt.tight_layout()
+plt.show()
+    
